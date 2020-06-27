@@ -6,6 +6,7 @@
 // often useful headers:
 #include <ompl/util/RandomNumbers.h>
 #include <ompl/tools/config/SelfConfig.h>
+#include <ompl/geometric/planners/rrt/RRTstar_v2.h>
 
 namespace ompl
 {
@@ -30,7 +31,7 @@ namespace ompl
             virtual void setProblemDefinition(const base::ProblemDefinitionPtr &pdef);
 
         private:
-            base::PlannerPtr pPlanner_;
+            RRTstarV2Ptr pPlanner_;
             double internal_planner_planning_time_;
         };
     } // namespace geometric

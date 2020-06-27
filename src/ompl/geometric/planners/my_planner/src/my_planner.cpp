@@ -1,6 +1,5 @@
 #include <limits>
 
-#include "ompl/geometric/planners/rrt/RRT.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
 
@@ -15,7 +14,7 @@ ompl::geometric::MyPlanner::MyPlanner(const base::SpaceInformationPtr &si) :
     // create an internal planner
     base::SpaceInformationPtr si_copy = si_; // copy the space information. This is because in base planner constructor, si is MOVED
                                              // into si_!!!
-    pPlanner_.reset(new RRT(si_copy));
+    pPlanner_.reset(new RRTstarV2(si_copy));
     
     // settings
     internal_planner_planning_time_ = 1.0;
@@ -66,18 +65,33 @@ ompl::base::PlannerStatus ompl::geometric::MyPlanner::solve(const base::PlannerT
     // ensures that there is at least one input state and a ompl::base::Goal object specified
     checkValidity();
 
-    // get a handle to the Goal from the ompl::base::ProblemDefinition member, pdef_
-    // base::Goal *goal = pdef_->getGoal().get();
-
     // call internal planner to try to solve the problem within designated time.
-    ompl::base::PlannerStatus status = pPlanner_->solve(internal_planner_planning_time_);
+    ompl::base::PlannerStatus status = pPlanner_->solve(base::timedPlannerTerminationCondition(internal_planner_planning_time_));
     OMPL_INFORM("MyPlanner::solve finished");
 
     // get planner data
     base::PlannerData plannerData(si_);
     pPlanner_->getPlannerData(plannerData);
     unsigned int numVertices = plannerData.numVertices();
+    unsigned int numEdges = plannerData.numEdges();
+    unsigned int numStartVertices = plannerData.numStartVertices();
     OMPL_INFORM("planner num of vertices = %d", numVertices);
+    OMPL_INFORM("planner num of edges = %d", numEdges);
+    OMPL_INFORM("planner num of start vertices = %d", numStartVertices);
+
+    // get motions
+    std::vector<ompl::geometric::RRTstarV2::Motion *> motions;
+    OMPL_INFORM("planner get motions");
+    pPlanner_->getMotions(motions);
+    OMPL_INFORM("motions size = %d", motions.size());
+
+    // for all vertices, check distances to start vertex
+    // const base::StateSpacePtr pStateSpace = si_->getStateSpace();
+    // base::PlannerDataVertex startVertex = plannerData.getStartVertex(0); // get the first start vertex only
+    // for (int i = 0; i < numVertices; ++i) {
+    //     base::PlannerDataVertex vertex = plannerData.getVertex(i);
+        
+    // }
 
     // TODO, if solution is found, just return
     if (status) {
