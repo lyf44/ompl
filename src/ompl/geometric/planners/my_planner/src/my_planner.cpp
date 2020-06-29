@@ -75,17 +75,32 @@ ompl::base::PlannerStatus ompl::geometric::MyPlanner::solve(const base::PlannerT
     unsigned int numVertices = plannerData.numVertices();
     unsigned int numEdges = plannerData.numEdges();
     unsigned int numStartVertices = plannerData.numStartVertices();
-    OMPL_INFORM("planner num of vertices = %d", numVertices);
-    OMPL_INFORM("planner num of edges = %d", numEdges);
-    OMPL_INFORM("planner num of start vertices = %d", numStartVertices);
+    OMPL_INFORM("MyPlanner: planner num of vertices = %d", numVertices);
+    OMPL_INFORM("MyPlanner: planner num of edges = %d", numEdges);
+    OMPL_INFORM("MyPlanner: planner num of start vertices = %d", numStartVertices);
 
     // get motions
-    std::vector<ompl::geometric::RRTstarV2::Motion *> motions;
-    OMPL_INFORM("planner get motions");
-    pPlanner_->getMotions(motions);
-    OMPL_INFORM("motions size = %d", motions.size());
+    std::vector<ompl::geometric::RRTstarV2::Motion*> pMotions;
+    OMPL_INFORM("MyPlanner: planner get motions");
+    pPlanner_->getMotions(pMotions);
+    OMPL_INFORM("MyPlanner: motions size = %d", pMotions.size());
 
-    // for all vertices, check distances to start vertex
+    // for all vertices sampled, find the best vertices
+    ompl::base::GoalPtr pGoal = pdef_->getGoal();
+    ompl::geometric::RRTstarV2::Motion* pBestMotion = NULL;
+    double best_cost = std::numeric_limits<double>::max();
+    for (auto pMotion: pMotions) {
+        double cost_from_source = pMotion->cost.value();
+        double cost_to_go = 0.0;
+        pGoal->isSatisfied(pMotion->state, &cost_to_go);
+        double total_cost = cost_from_source + cost_to_go;
+        if (total_cost < best_cost) {
+            best_cost = total_cost;
+            pBestMotion = pMotion;
+        }
+    }
+    OMPL_INFORM("MyPlanner: best motion found with cost %f", best_cost);
+
     // const base::StateSpacePtr pStateSpace = si_->getStateSpace();
     // base::PlannerDataVertex startVertex = plannerData.getStartVertex(0); // get the first start vertex only
     // for (int i = 0; i < numVertices; ++i) {
