@@ -583,7 +583,7 @@ ompl::base::PlannerStatus ompl::geometric::RRTstarV2::solve(const base::PlannerT
 
         // Does the solution satisfy the optimization objective?
         psol.setOptimized(opt_, newSolution->cost, opt_->isSatisfied(bestCost_));
-        pdef_->addSolutionPath(psol);
+        // pdef_->addSolutionPath(psol);
     }
     // No else, we have nothing
 

@@ -1,12 +1,11 @@
 #ifndef OMPL_GEOMETRIC_PLANNERS_MYPLANNER_MYPLANNER_
 #define OMPL_GEOMETRIC_PLANNERS_MYPLANNER_MYPLANNER_
 
-#include <ompl/base/Planner.h>
-
-// often useful headers:
-#include <ompl/util/RandomNumbers.h>
-#include <ompl/tools/config/SelfConfig.h>
-#include <ompl/geometric/planners/rrt/RRTstar_v2.h>
+#include "ompl/base/Planner.h"
+#include "ompl/util/RandomNumbers.h"
+#include "ompl/tools/config/SelfConfig.h"
+#include "ompl/geometric/planners/rrt/RRTstar_v2.h"
+#include "ompl/base/OptimizationObjective.h"
 
 namespace ompl
 {
@@ -30,9 +29,10 @@ namespace ompl
         
             virtual void setProblemDefinition(const base::ProblemDefinitionPtr &pdef);
 
-        private:
+        protected:
             RRTstarV2Ptr pPlanner_;
             double internal_planner_planning_time_;
+            base::OptimizationObjectivePtr opt_;
         };
     } // namespace geometric
 } // namespace ompl

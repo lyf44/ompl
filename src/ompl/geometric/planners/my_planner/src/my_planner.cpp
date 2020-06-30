@@ -2,7 +2,7 @@
 
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
-
+#include "ompl/base/objectives/PathLengthOptimizationObjective.h"
 #include "ompl/geometric/planners/my_planner/my_planner.h"
 
 ompl::geometric::MyPlanner::MyPlanner(const base::SpaceInformationPtr &si) : 
@@ -14,7 +14,7 @@ ompl::geometric::MyPlanner::MyPlanner(const base::SpaceInformationPtr &si) :
     // create an internal planner
     base::SpaceInformationPtr si_copy = si_; // copy the space information. This is because in base planner constructor, si is MOVED
                                              // into si_!!!
-    pPlanner_.reset(new RRTstarV2(si_copy));
+    pPlanner_ = std::make_shared<RRTstarV2>(si_copy);
     
     // settings
     internal_planner_planning_time_ = 1.0;
@@ -35,6 +35,7 @@ ompl::geometric::MyPlanner::~MyPlanner()
 void ompl::geometric::MyPlanner::clear(void)
 {
     Planner::clear();
+    pPlanner_->clear();
     // sampler_.reset();
     // freeMemory();
     // if (nn_)
@@ -45,6 +46,28 @@ void ompl::geometric::MyPlanner::clear(void)
 void ompl::geometric::MyPlanner::setup(void)
 {
     Planner::setup();
+
+    if (pdef_)
+    {
+        if (pdef_->hasOptimizationObjective())
+            opt_ = pdef_->getOptimizationObjective();
+        else
+        {
+            OMPL_INFORM("%s: No optimization objective specified. Defaulting to optimizing path length for the allowed "
+                        "planning time.",
+                        getName().c_str());
+            opt_ = std::make_shared<base::PathLengthOptimizationObjective>(si_);
+
+            // Store the new objective in the problem def'n
+            pdef_->setOptimizationObjective(opt_);
+        }
+    }
+    else
+    {
+        OMPL_INFORM("%s: problem definition is not set, deferring setup completion...", getName().c_str());
+        setup_ = false;
+    }
+
     // tools::SelfConfig sc(si_, getName());
     // sc.configurePlannerRange(maxDistance_);
 
@@ -90,10 +113,14 @@ ompl::base::PlannerStatus ompl::geometric::MyPlanner::solve(const base::PlannerT
     ompl::geometric::RRTstarV2::Motion* pBestMotion = NULL;
     double best_cost = std::numeric_limits<double>::max();
     for (auto pMotion: pMotions) {
-        double cost_from_source = pMotion->cost.value();
-        double cost_to_go = 0.0;
-        pGoal->isSatisfied(pMotion->state, &cost_to_go);
-        double total_cost = cost_from_source + cost_to_go;
+        if (pMotion->parent == nullptr) continue; // filter out start motion
+        // double cost_from_source = pMotion->cost.value();
+        // double cost_to_go = 0.0;
+        // pGoal->isSatisfied(pMotion->state, &cost_to_go);
+        // double total_cost = cost_from_source + cost_to_go;
+        const base::Cost cost_to_come = pMotion->cost;
+        const base::Cost cost_to_go = opt_->costToGo(pMotion->state, pdef_->getGoal().get());  // lower-bounding cost from the state to the goal
+        double total_cost = opt_->combineCosts(cost_to_come, cost_to_go).value();
         if (total_cost < best_cost) {
             best_cost = total_cost;
             pBestMotion = pMotion;
@@ -101,19 +128,33 @@ ompl::base::PlannerStatus ompl::geometric::MyPlanner::solve(const base::PlannerT
     }
     OMPL_INFORM("MyPlanner: best motion found with cost %f", best_cost);
 
-    // const base::StateSpacePtr pStateSpace = si_->getStateSpace();
-    // base::PlannerDataVertex startVertex = plannerData.getStartVertex(0); // get the first start vertex only
-    // for (int i = 0; i < numVertices; ++i) {
-    //     base::PlannerDataVertex vertex = plannerData.getVertex(i);
-        
-    // }
-
-    // TODO, if solution is found, just return
-    if (status) {
-        return status;
+    // construct the solution path
+    std::vector<ompl::geometric::RRTstarV2::Motion*> mpath;
+    ompl::geometric::RRTstarV2::Motion* pMotion = pBestMotion;
+    while (pMotion != nullptr)
+    {
+        mpath.push_back(pMotion);
+        pMotion = pMotion->parent;
     }
 
-    return status;
+    // set the solution path
+    auto path(std::make_shared<PathGeometric>(si_));
+    for (int i = mpath.size() - 1; i >= 0; --i)
+        path->append(mpath[i]->state);
+
+    // Add the solution path.
+    base::PlannerSolution psol(path);
+    psol.setPlannerName(getName());
+
+    // If we don't have a goal motion, the solution is approximate
+    // if (!bestGoalMotion_)
+    //     psol.setApproximate(approxDist);
+
+    // Does the solution satisfy the optimization objective?
+    // psol.setOptimized(opt_, newSolution->cost, opt_->isSatisfied(bestCost_));
+    pdef_->addSolutionPath(psol);
+
+    return base::PlannerStatus(true, false);
 }
 
 void ompl::geometric::MyPlanner::getPlannerData(base::PlannerData &data) const
