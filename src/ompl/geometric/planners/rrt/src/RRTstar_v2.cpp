@@ -551,7 +551,7 @@ ompl::base::PlannerStatus ompl::geometric::RRTstarV2::solve(const base::PlannerT
     else if (approxGoalMotion)
     {
         // We don't have a solution, but we do have an approximate solution
-        newSolution = approxGoalMotion;
+        // newSolution = approxGoalMotion;
     }
     // No else, we have nothing
 

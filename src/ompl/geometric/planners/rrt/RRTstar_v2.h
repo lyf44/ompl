@@ -365,6 +365,11 @@ namespace ompl
                 return bestCost_;
             }
 
+            Motion* getBestGoalMotion() const
+            {
+                return bestGoalMotion_;
+            }
+
         protected:
             /** \brief Create the samplers */
             void allocSampler();

@@ -92,41 +92,48 @@ ompl::base::PlannerStatus ompl::geometric::MyPlanner::solve(const base::PlannerT
     ompl::base::PlannerStatus status = pPlanner_->solve(base::timedPlannerTerminationCondition(internal_planner_planning_time_));
     OMPL_INFORM("MyPlanner::solve finished");
 
-    // get planner data
-    base::PlannerData plannerData(si_);
-    pPlanner_->getPlannerData(plannerData);
-    unsigned int numVertices = plannerData.numVertices();
-    unsigned int numEdges = plannerData.numEdges();
-    unsigned int numStartVertices = plannerData.numStartVertices();
-    OMPL_INFORM("MyPlanner: planner num of vertices = %d", numVertices);
-    OMPL_INFORM("MyPlanner: planner num of edges = %d", numEdges);
-    OMPL_INFORM("MyPlanner: planner num of start vertices = %d", numStartVertices);
-
-    // get motions
-    std::vector<ompl::geometric::RRTstarV2::Motion*> pMotions;
-    OMPL_INFORM("MyPlanner: planner get motions");
-    pPlanner_->getMotions(pMotions);
-    OMPL_INFORM("MyPlanner: motions size = %d", pMotions.size());
-
-    // for all vertices sampled, find the best vertices
-    ompl::base::GoalPtr pGoal = pdef_->getGoal();
     ompl::geometric::RRTstarV2::Motion* pBestMotion = NULL;
-    double best_cost = std::numeric_limits<double>::max();
-    for (auto pMotion: pMotions) {
-        if (pMotion->parent == nullptr) continue; // filter out start motion
-        // double cost_from_source = pMotion->cost.value();
-        // double cost_to_go = 0.0;
-        // pGoal->isSatisfied(pMotion->state, &cost_to_go);
-        // double total_cost = cost_from_source + cost_to_go;
-        const base::Cost cost_to_come = pMotion->cost;
-        const base::Cost cost_to_go = opt_->costToGo(pMotion->state, pdef_->getGoal().get());  // lower-bounding cost from the state to the goal
-        double total_cost = opt_->combineCosts(cost_to_come, cost_to_go).value();
-        if (total_cost < best_cost) {
-            best_cost = total_cost;
-            pBestMotion = pMotion;
+    if (status == ompl::base::PlannerStatus::EXACT_SOLUTION) {
+        // if exact solution is found, best motion is best goal motion
+        pBestMotion = pPlanner_->getBestGoalMotion();
+        OMPL_INFORM("MyPlanner: best motion retrieved from internal planner");
+    } else {
+        // get planner data
+        base::PlannerData plannerData(si_);
+        pPlanner_->getPlannerData(plannerData);
+        unsigned int numVertices = plannerData.numVertices();
+        unsigned int numEdges = plannerData.numEdges();
+        unsigned int numStartVertices = plannerData.numStartVertices();
+        OMPL_INFORM("MyPlanner: planner num of vertices = %d", numVertices);
+        OMPL_INFORM("MyPlanner: planner num of edges = %d", numEdges);
+        OMPL_INFORM("MyPlanner: planner num of start vertices = %d", numStartVertices);
+
+        // get motions
+        std::vector<ompl::geometric::RRTstarV2::Motion*> pMotions;
+        OMPL_INFORM("MyPlanner: planner get motions");
+        pPlanner_->getMotions(pMotions);
+        OMPL_INFORM("MyPlanner: motions size = %d", pMotions.size());
+
+        // for all vertices sampled, find the best vertices
+        ompl::base::GoalPtr pGoal = pdef_->getGoal();
+
+        double best_cost = std::numeric_limits<double>::max();
+        for (auto pMotion: pMotions) {
+            if (pMotion->parent == nullptr) continue; // filter out start motion
+            // double cost_from_source = pMotion->cost.value();
+            // double cost_to_go = 0.0;
+            // pGoal->isSatisfied(pMotion->state, &cost_to_go);
+            // double total_cost = cost_from_source + cost_to_go;
+            const base::Cost cost_to_come = pMotion->cost;
+            const base::Cost cost_to_go = opt_->costToGo(pMotion->state, pdef_->getGoal().get());  // lower-bounding cost from the state to the goal
+            double total_cost = opt_->combineCosts(cost_to_come, cost_to_go).value();
+            if (total_cost < best_cost) {
+                best_cost = total_cost;
+                pBestMotion = pMotion;
+            }
         }
+        OMPL_INFORM("MyPlanner: best motion found with cost %f", best_cost);
     }
-    OMPL_INFORM("MyPlanner: best motion found with cost %f", best_cost);
 
     // construct the solution path
     std::vector<ompl::geometric::RRTstarV2::Motion*> mpath;
@@ -154,7 +161,7 @@ ompl::base::PlannerStatus ompl::geometric::MyPlanner::solve(const base::PlannerT
     // psol.setOptimized(opt_, newSolution->cost, opt_->isSatisfied(bestCost_));
     pdef_->addSolutionPath(psol);
 
-    return base::PlannerStatus(true, false);
+    return base::PlannerStatus(true, status != ompl::base::PlannerStatus::EXACT_SOLUTION);
 }
 
 void ompl::geometric::MyPlanner::getPlannerData(base::PlannerData &data) const
